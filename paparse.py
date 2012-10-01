@@ -62,9 +62,9 @@ def parse_tree(s):
             cur_ctx = ctx[0]
             if cur_ctx["current_key"] in cur_ctx["tree"]:
                 if type(cur_ctx["tree"][cur_ctx["current_key"]]) is not list:
-                    cur_ctx["tree"][cur_ctx["current_key"]] = list(cur_ctx["tree"][cur_ctx["current_key"]], old_ctx["tree"])
+                    cur_ctx["tree"][cur_ctx["current_key"]] = [cur_ctx["tree"][cur_ctx["current_key"]], old_ctx["tree"]]
                 else:
-                    cur_ctx["tree"][cur_ctx["current_key"]].push(old_ctx["tree"])
+                    cur_ctx["tree"][cur_ctx["current_key"]].append(old_ctx["tree"])
             else:
                 cur_ctx["tree"][cur_ctx["current_key"]] = old_ctx["tree"]
         elif state is S_WAITING_DICT_NAME:
