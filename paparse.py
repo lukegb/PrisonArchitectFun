@@ -1,5 +1,7 @@
 import string
+import json
 from pprint import pprint
+import os.path
 
 class ParseException(Exception):
     pass
@@ -88,6 +90,24 @@ def parse_save(f):
     # .prison files are key-value pairs
     v = f.read()
     prison = parse_tree(v)
+    return prison
+
+def parse_save_from_file(fn, cache=True):
+    # .prison files may take substantial time to load
+    cache_fn = os.path.join("prison_cache", os.path.abspath(fn).replace("/", "_")) # how do you get the path separator?...
+    if cache and os.path.exists(cache_fn):
+        with open(cache_fn, 'r') as cache_file:
+            return json.load(cache_file)
+    
+    with open(fn, 'r') as prison_file:
+        prison = parse_save(prison_file)
+
+    if cache and os.path.exists("prison_cache"):
+        if not os.path.exists("prison_cache"):
+            os.makedirs(os.path.dirname(cache_fn))
+        with open(cache_fn, 'w') as cache_file:
+            json.dump(prison, cache_file)
+
     return prison
 
 if __name__ == '__main__':
