@@ -24,8 +24,8 @@ def extract_token(s):
     while end_pos < len(s) and ((not quoted_string and s[end_pos] not in string.whitespace) or \
           (quoted_string and s[end_pos] != '"')):
         end_pos += 1
-    if end_pos >= len(s) - 1:
-        raise ParseException("Trailing garbage found")
+    if end_pos >= len(s):
+        raise ParseException("Trailing garbage found: %s" % (s, ))
 
     token = s[pos:end_pos]
     rest = s[end_pos:]

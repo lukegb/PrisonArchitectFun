@@ -11,7 +11,7 @@ MATERIAL_H = 64
 
 ROTATETYPE_ALL_ORIENTATIONS = 1
 ROTATETYPE_IDENTICAL_HORIZONTAL = 2
-ROTATETYPE_UNKNOWN_ALL = 3
+ROTATETYPE_ALL_ORIENTATIONS_SAME_DIMS = 3
 ROTATETYPE_NO_ROTATION = 4
 
 LINK_CHOOSER = [
@@ -26,10 +26,10 @@ LINK_CHOOSER = [
   (0, 1, 0, 1, 1, 0, 0, 0, 0),
   (0, 1, 0, 0, 1, 0, 0, 1, 0),
   (9, 9, 9, 9, 9, 9, 9, 9, 9), #### INVESTIGATE MORE
-  (9, 9, 9, 9, 9, 9, 9, 9, 9), #### INVESTIGATE MORE
+  (0, 0, 0, 1, 1, 1, 0, 0, 0),
   (9, 9, 9, 9, 9, 9, 9, 9, 9), #### INVESTIGATE MORE
   (0, 1, 0, 0, 1, 1, 0, 1, 0),
-  (0, 0, 0, 1, 1, 0, 0, 1, 0),
+  (0, 0, 0, 1, 1, 1, 0, 1, 0),
   (0, 1, 0, 1, 1, 0, 0, 1, 0),
   (0, 1, 0, 1, 1, 1, 0, 0, 0),
   (0, 1, 0, 1, 1, 1, 0, 1, 0)]
@@ -42,9 +42,13 @@ def reorganise_raw_tree(tree, in_plurals):
             for v in kv:
                 new_tree[kk][v["Name"]] = v
         else:
-            for vk, vv in kv:
-                vv["_key"] = vk
-                new_tree[kk][vv["Name"]] = vv
+            no = new_tree[kk]["Objects"] = dict()
+            for vk, vv in kv.iteritems():
+                if type(vv) is dict and "Name" in vv:
+                    vv["_key"] = vk
+                    no[vv["Name"]] = vv
+                else:
+                    new_tree[kk][vk] = vv
     return new_tree
 
 def load_resources(f, reorganise=True, in_plurals=False):
@@ -93,10 +97,10 @@ def load_sprite_names():
 
 def _fetch_sprite_for_object(name, sheet, spritebank):
     # check that we have sprites...
-    if "Sprites" not in spritebank:
+    if spritebank is None or "Sprites" not in spritebank or "Objects" not in spritebank["Sprites"]:
         raise Exception("spritebank has no Sprites!")
     # and now the actual sprite...
-    if name not in spritebank["Sprites"]:
+    if name not in spritebank["Sprites"]["Objects"]:
         raise Exception("Sprites section has no %s!" % (name,))
 
     # RotateType notes:
@@ -104,7 +108,7 @@ def _fetch_sprite_for_object(name, sheet, spritebank):
     # 2: Facing towards, Facing left - only two available orientations
     # 3: Appears same as 1?
     # 4: No rotation.
-    sd = spritebank["Sprites"][name] # Sprite Data
+    sd = spritebank["Sprites"]["Objects"][name] # Sprite Data
     if "RotateType" not in sd:
         sd["RotateType"] = 4 # no rotation assumed
     if "x" not in sd:
@@ -124,7 +128,7 @@ def _fetch_sprite_for_object(name, sheet, spritebank):
     y_pos = int(sd["y"]) * SPRITE_H
     sprite_w = int(sd["w"]) * SPRITE_W
     sprite_h = int(sd["h"]) * SPRITE_H
-    if sd["RotateType"] == ROTATETYPE_ALL_ORIENTATIONS or sd["RotateType"] == ROTATETYPE_UNKNOWN_ALL:
+    if sd["RotateType"] == ROTATETYPE_ALL_ORIENTATIONS or sd["RotateType"] == ROTATETYPE_ALL_ORIENTATIONS_SAME_DIMS:
         # get first:
         up = sheet.crop((x_pos, y_pos, sprite_w + x_pos, sprite_h + y_pos))
 
@@ -133,12 +137,13 @@ def _fetch_sprite_for_object(name, sheet, spritebank):
 
         # now the tricky one
         x_pos += sprite_w
-        y_pos += sprite_h
-        sprite_w, sprite_h = sprite_h, sprite_w
-        y_pos -= sprite_h
+        if sd["RotateType"] == ROTATETYPE_ALL_ORIENTATIONS:
+            y_pos += sprite_h
+            sprite_w, sprite_h = sprite_h, sprite_w
+            y_pos -= sprite_h
         left = sheet.crop((x_pos, y_pos, sprite_w + x_pos, sprite_h + y_pos))
 
-        right = left.transpose(PIL.FLIP_LEFT_RIGHT)
+        right = left.transpose(PIL.Image.FLIP_LEFT_RIGHT)
     elif sd["RotateType"] == ROTATETYPE_IDENTICAL_HORIZONTAL:
         # get first:
         up = sheet.crop((x_pos, y_pos, sprite_w + x_pos, sprite_h + y_pos))
@@ -151,7 +156,7 @@ def _fetch_sprite_for_object(name, sheet, spritebank):
         y_pos -= sprite_h
         left = sheet.crop((x_pos, y_pos, sprite_w + x_pos, sprite_h + y_pos))
 
-        right = left.transpose(PIL.FLIP_LEFT_RIGHT)
+        right = left.transpose(PIL.Image.FLIP_LEFT_RIGHT)
     elif sd["RotateType"] == ROTATETYPE_NO_ROTATION:
         up = sheet.crop((x_pos, y_pos, sprite_w + x_pos, sprite_h + y_pos))
         down = left = right = up
@@ -167,6 +172,10 @@ def _fetch_sprite_for_material(name, sheet, mat):
     OK_ST = ("Linked", "RandomArea", "AlignedArea", "Single")
     if mat["SpriteType"] not in OK_ST:
         raise Exception("material %s has unknown SpriteType: %s!" % (name, mat["SpriteType"]))
+
+    # TODO: figure out why this is silly
+    if mat["Name"] == "Road":
+        mat["SpriteType"] = "Single"
 
     if mat["SpriteType"] == "RandomArea" or mat["SpriteType"] == "AlignedArea":
         # Sprite0 is coords
@@ -204,15 +213,25 @@ def select_tile_for_linked(mat):
     # list(0, 1, 0,
     #      0, 1, 1,
     #      0, 0, 0) indicates L shape
+    for x in xrange(len(LINK_CHOOSER)):
+        xmat = LINK_CHOOSER[x]
+        correct = True
+        for y in xrange(9):
+            if mat[y] != xmat[y]:
+                correct = False
+                break
+        if correct:
+            return x
+    raise Exception("Bad matrix %s passed to tile selection" % (str(mat),))
     
     
 
 _tileset_sheet = None
 _objects_sheet = None
 def fetch_sprite(material_type, material_name):
-    global _materials, _tileset_sheet, _objects_sheet
-    if _materials is None:
-        load_materials()
+    global _tileset_sheet, _objects_sheet
+    mats = load_materials()
+    snames = load_sprite_names()
     if _tileset_sheet is None:
         _tileset_sheet = PIL.Image.open("resources/tileset.png", 'r')
     if _objects_sheet is None:
@@ -223,13 +242,13 @@ def fetch_sprite(material_type, material_name):
     if material_type not in _materials:
         raise Exception("Material type %s not found!" % (material_type,))
 
-    mat = _materials[material_type]
+    mat = mats[material_type]
 
     # sprite?
     # objects have straight-sprite names
     # materials are trickier
     if material_type == "Object":
-        return _fetch_sprite_for_object(material_name, _objects_sheet, _sprite_names)
+        return _fetch_sprite_for_object(mat[material_name]["Sprite"], _objects_sheet, snames)
     elif material_type == "Material":
         return _fetch_sprite_for_material(material_name, _tileset_sheet, mat[material_name])
     else:
