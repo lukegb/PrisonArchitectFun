@@ -178,7 +178,7 @@ def draw_snapshot(prison, max_size=0):
                             # redraw the wall!
                             im.paste(rescale_image(wall_map[c_n]["sprite"], scale_factor), rescale_coordinates(wall_map[c_n]["coords"], scale_factor))
                 else:
-                    im.paste(rescale_image(obj[0], scale_factor), rescale_coordinates(obj[1], scale_factor), rescale_image(obj[1], scale_factor))
+                    im.paste(rescale_image(obj[0], scale_factor), rescale_coordinates(obj[1], scale_factor), rescale_image(obj[2], scale_factor))
     return im
 
 if __name__ == '__main__':
