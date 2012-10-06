@@ -51,13 +51,42 @@ def get_z_for_object(object_name):
     # TODO: implement! :)
     return resources.renderdepth_for_object(object_name)
 
-def draw_snapshot(prison):
+def rescale_image(pilimage, scale_factor):
+    return pilimage.resize((pilimage.size[0] * scale_factor, pilimage.size[1] * scale_factor))
+
+def rescale_coordinates(xy, scale_factor):
+    return (xy[0] * scale_factor, xy[1] * scale_factor)
+
+def draw_snapshot(prison, max_size=0):
+    """ Draw a .prison file represented as Python dictionaries.
+
+    prison parameters is the .prison file Python dictionary representation parameter.
+
+    max_size allows you to specify the maximum number of pixels the image can be along a single axis (if integer).
+        If it is an tuple, (width, height), then draw_snapshot will rescale the image to fit within the two parameters """
     # how big is this?
     cells_wide = int(prison["NumCellsX"])
     cells_high = int(prison["NumCellsY"])
 
     width = CELL_WIDTH * cells_wide
     height = CELL_HEIGHT * cells_high
+
+    scale_factor = 1
+
+    if max_size != 0:
+        if type(max_size) is int:
+            largest_dimension = max(width, height)
+            if largest_dimension == width:
+                scale_factor = max_size / width
+            else:
+                scale_factor = max_size / height
+        else:
+            max_width, max_height = max_size
+            width_sf = max_width / width
+            height_sf = max_height / height
+            scale_factor = min(width_sf, height_sf)
+
+    width, height = width * scale_factor, height * scale_factor
 
     im = PIL.Image.new("RGBA", (width, height))
 
@@ -133,7 +162,7 @@ def draw_snapshot(prison):
                     s = object_sprites[orient]
                     sprite_w, sprite_h = s.size
                     pixel_pos = (int(coords[0] * CELL_WIDTH - sprite_w / 2), int(coords[1] * CELL_HEIGHT - sprite_h / 2))
-                    im.paste(s, pixel_pos, s)
+                    im.paste(rescale_image(s, scale_factor), rescale_coordinates(pixel_pos, scale_factor), rescale_image(s, scale_factor))
 
                     # is this sprite going to draw atop a wall?
                     # if so, NO! BAD SPRITE.
@@ -147,9 +176,9 @@ def draw_snapshot(prison):
                         c_n = "%d %d" % (c_x, c_y)
                         if c_n in wall_map: # yes
                             # redraw the wall!
-                            im.paste(wall_map[c_n]["sprite"], wall_map[c_n]["coords"])
+                            im.paste(rescale_image(wall_map[c_n]["sprite"], scale_factor), rescale_coordinates(wall_map[c_n]["coords"], scale_factor))
                 else:
-                    im.paste(*obj)
+                    im.paste(rescale_image(obj[0], scale_factor), rescale_coordinates(obj[1], scale_factor), rescale_image(obj[1], scale_factor))
     return im
 
 if __name__ == '__main__':
