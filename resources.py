@@ -14,25 +14,33 @@ ROTATETYPE_IDENTICAL_HORIZONTAL = 2
 ROTATETYPE_ALL_ORIENTATIONS_SAME_DIMS = 3
 ROTATETYPE_NO_ROTATION = 4
 
+import os.path
+RESOURCES_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "resources")
+
 LINK_CHOOSER = [
-  (0, 0, 0, 1, 1, 0, 0, 0, 0),
-  (0, 1, 0, 0, 1, 0, 0, 0, 0),
-  (0, 0, 0, 0, 1, 1, 0, 0, 0),
-  (0, 0, 0, 0, 1, 0, 0, 1, 0),
-  (9, 9, 9, 9, 9, 9, 9, 9, 9), #### INVESTIGATE MORE
-  (0, 1, 0, 0, 1, 1, 0, 0, 0),
-  (0, 0, 0, 0, 1, 1, 0, 1, 0),
-  (0, 0, 0, 1, 1, 0, 0, 1, 0),
-  (0, 1, 0, 1, 1, 0, 0, 0, 0),
-  (0, 1, 0, 0, 1, 0, 0, 1, 0),
-  (9, 9, 9, 9, 9, 9, 9, 9, 9), #### INVESTIGATE MORE
-  (0, 0, 0, 1, 1, 1, 0, 0, 0),
-  (9, 9, 9, 9, 9, 9, 9, 9, 9), #### INVESTIGATE MORE
-  (0, 1, 0, 0, 1, 1, 0, 1, 0),
-  (0, 0, 0, 1, 1, 1, 0, 1, 0),
-  (0, 1, 0, 1, 1, 0, 0, 1, 0),
-  (0, 1, 0, 1, 1, 1, 0, 0, 0),
-  (0, 1, 0, 1, 1, 1, 0, 1, 0)]
+  [(0, 0, 0, 1, 1, 0, 0, 0, 0)],
+  [(0, 1, 0, 0, 1, 0, 0, 0, 0)],
+  [(0, 0, 0, 0, 1, 1, 0, 0, 0), (0, 0, 0, 0, 1, 0, 0, 0, 0)],
+  [(0, 0, 0, 0, 1, 0, 0, 1, 0)],
+  [(9, 9, 9, 9, 9, 9, 9, 9, 9)], #### INVESTIGATE MORE
+  [(0, 1, 0, 0, 1, 1, 0, 0, 0)],
+  [(0, 0, 0, 0, 1, 1, 0, 1, 0)],
+  [(0, 0, 0, 1, 1, 0, 0, 1, 0)],
+  [(0, 1, 0, 1, 1, 0, 0, 0, 0)],
+  [(0, 1, 0, 0, 1, 0, 0, 1, 0)],
+  [(9, 9, 9, 9, 9, 9, 9, 9, 9)], #### INVESTIGATE MORE
+  [(0, 0, 0, 1, 1, 1, 0, 0, 0)],
+  [(9, 9, 9, 9, 9, 9, 9, 9, 9)], #### INVESTIGATE MORE
+  [(0, 1, 0, 0, 1, 1, 0, 1, 0)],
+  [(0, 0, 0, 1, 1, 1, 0, 1, 0)],
+  [(0, 1, 0, 1, 1, 0, 0, 1, 0)],
+  [(0, 1, 0, 1, 1, 1, 0, 0, 0)],
+  [(0, 1, 0, 1, 1, 1, 0, 1, 0)]]
+
+VERTICAL_OFFSET_CORRECTOR = {
+    "Fridge": 34,
+    "Cooker": 34
+}
 
 def reorganise_raw_tree(tree, in_plurals):
     new_tree = {}
@@ -52,7 +60,7 @@ def reorganise_raw_tree(tree, in_plurals):
     return new_tree
 
 def load_resources(f, reorganise=True, in_plurals=False):
-    cache_filename = f.replace("resources/", "resource_cache/")
+    cache_filename = os.path.join(RESOURCES_PATH, "..", "resource_cache", f)
     # check to see if we have a .json file there already...
     try:
         with open(cache_filename, 'r') as v:
@@ -61,7 +69,7 @@ def load_resources(f, reorganise=True, in_plurals=False):
         pass
 
     # now load file
-    with open(f, 'r') as v:
+    with open(os.path.join(RESOURCES_PATH, f), 'r') as v:
         tree = parse_tree(v.read())
 
     # organise tree into a nice dictionary
@@ -81,8 +89,8 @@ _materials = None
 def load_materials():
     global _materials
     if _materials is None:
-        _materials = load_resources("resources/materials.txt")
-        _materialsb = load_resources("resources/materials-new.txt")
+        _materials = load_resources("materials.txt")
+        _materialsb = load_resources("materials-new.txt")
         for k in _materials.keys():
             if k in _materialsb:
                 _materials[k].update(_materialsb[k])
@@ -92,8 +100,9 @@ _sprite_names = None
 def load_sprite_names():
     global _sprite_names
     if _sprite_names is None:
-        _sprite_names = load_resources("resources/objects.spritebank", True, True)
+        _sprite_names = load_resources("objects.spritebank", True, True)
     return _sprite_names
+
 
 def _fetch_sprite_for_object(name, sheet, spritebank):
     # check that we have sprites...
@@ -141,7 +150,7 @@ def _fetch_sprite_for_object(name, sheet, spritebank):
             y_pos += sprite_h
             sprite_w, sprite_h = sprite_h, sprite_w
             y_pos -= sprite_h
-        left = sheet.crop((x_pos, y_pos, sprite_w + x_pos, sprite_h + y_pos))
+        left = sheet.crop((x_pos, y_pos, sprite_w + x_pos - VERTICAL_OFFSET_CORRECTOR.get(name, 0), sprite_h + y_pos))
 
         right = left.transpose(PIL.Image.FLIP_LEFT_RIGHT)
     elif sd["RotateType"] == ROTATETYPE_IDENTICAL_HORIZONTAL:
@@ -154,7 +163,7 @@ def _fetch_sprite_for_object(name, sheet, spritebank):
         y_pos += sprite_h
         sprite_w, sprite_h = sprite_h, sprite_w
         y_pos -= sprite_h
-        left = sheet.crop((x_pos, y_pos, sprite_w + x_pos, sprite_h + y_pos))
+        left = sheet.crop((x_pos, y_pos, sprite_w + x_pos - VERTICAL_OFFSET_CORRECTOR.get(name, 0), sprite_h + y_pos))
 
         right = left.transpose(PIL.Image.FLIP_LEFT_RIGHT)
     elif sd["RotateType"] == ROTATETYPE_NO_ROTATION:
@@ -214,32 +223,55 @@ def select_tile_for_linked(mat):
     #      0, 1, 1,
     #      0, 0, 0) indicates L shape
     for x in xrange(len(LINK_CHOOSER)):
-        xmat = LINK_CHOOSER[x]
-        correct = True
-        for y in xrange(9):
-            if mat[y] != xmat[y]:
-                correct = False
-                break
-        if correct:
-            return x
+        zmat = LINK_CHOOSER[x]
+        for z in range(len(zmat)):
+            xmat = zmat[z]
+            correct = True
+            for y in xrange(9):
+                if mat[y] != xmat[y]:
+                    correct = False
+                    break
+            if correct:
+                return x
     raise Exception("Bad matrix %s passed to tile selection" % (str(mat),))
-    
-    
+
+def material_name_to_material(material_type, material_name):
+    mats = load_materials()
+    return mats[material_type][material_name]
+
+def object_name_to_sprite_name(name):
+    return material_name_to_material("Object", name).get("Sprite")
+
+def renderdepth_for_object(name, spritebank=None):
+    # convert name to sprite name
+    name = object_name_to_sprite_name(name)
+    # check that we have sprites...
+    if spritebank is None:
+        spritebank = load_sprite_names()
+
+    if "Sprites" not in spritebank or "Objects" not in spritebank["Sprites"]:
+        raise Exception("spritebank has no Sprites!")
+    # and now the actual sprite...
+    if name not in spritebank["Sprites"]["Objects"]:
+        raise Exception("Sprites section has no %s!" % (name,))
+    return int(spritebank["Sprites"]["Objects"][name].get("RenderDepth", 1))
+
 
 _tileset_sheet = None
 _objects_sheet = None
 def fetch_sprite(material_type, material_name):
     global _tileset_sheet, _objects_sheet
-    mats = load_materials()
     snames = load_sprite_names()
     if _tileset_sheet is None:
-        _tileset_sheet = PIL.Image.open("resources/tileset.png", 'r')
+        _tileset_sheet = PIL.Image.open(os.path.join(RESOURCES_PATH, "tileset.png"), 'r')
     if _objects_sheet is None:
-        _objects_sheet = PIL.Image.open("resources/objects.png", 'r')
+        _objects_sheet = PIL.Image.open(os.path.join(RESOURCES_PATH, "objects.png"), 'r')
+
+    mats = load_materials()
 
     # materials are in tileset
     # others are in objects
-    if material_type not in _materials:
+    if material_type not in mats:
         raise Exception("Material type %s not found!" % (material_type,))
 
     mat = mats[material_type]

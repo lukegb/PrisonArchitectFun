@@ -4,7 +4,7 @@ import math
 import resources
 import PIL.Image
 
-DO_NOT_DRAW = ("Stack", "Light", "Prisoner")
+DO_NOT_DRAW = ("Stack", "Light", "Prisoner", "FoodTray", "FoodTrayDirty", "Meal", "Garbage", "Rubble")
 
 CELL_WIDTH = 64
 CELL_HEIGHT = 64
@@ -47,9 +47,11 @@ def xy_to_orientation(x, y):
     else:
         return 1
 
-def draw_snapshot(paf):
-    prison = parse_save_from_file(paf)
+def get_z_for_object(object_name):
+    # TODO: implement! :)
+    return resources.renderdepth_for_object(object_name)
 
+def draw_snapshot(prison):
     # how big is this?
     cells_wide = int(prison["NumCellsX"])
     cells_high = int(prison["NumCellsY"])
@@ -64,6 +66,8 @@ def draw_snapshot(paf):
     # draw the background-wall tiles
     background = resources.fetch_sprite("Material", "Dirt")
     cells = prison["Cells"]
+    objects_to_draw = dict()
+    objects_to_draw[-5] = dict()
     for x in xrange(cells_wide):
         for y in xrange(cells_high):
             cell_name = "%d %d" % (x, y)
@@ -79,15 +83,19 @@ def draw_snapshot(paf):
             if t == "Linked":
                 # build x-y matrix of positions
                 xy_mat = build_xy_material_matrix(cells, x, y)
-                d = m[resources.select_tile_for_linked(xy_mat)]
-                wall_map[cell_name] = {"sprite": d, "coords": (x * CELL_WIDTH, y * CELL_HEIGHT)}
+                sel_tile = resources.select_tile_for_linked(xy_mat)
+                d = m[sel_tile]
+                wall_map[cell_name] = dict(sprite=d, coords=(x * CELL_WIDTH, y * CELL_HEIGHT))
             else:
                 d = m[random.randint(0, len(m) - 1)]
-            im.paste(d, (x * CELL_WIDTH, y * CELL_HEIGHT))
+
+            #im.paste(d, (x * CELL_WIDTH, y * CELL_HEIGHT))
+            if y not in objects_to_draw[-5]:
+                objects_to_draw[-5][y] = list()
+            objects_to_draw[-5][y].append((d, (x * CELL_WIDTH, y * CELL_HEIGHT), d))
 
     # now overlay objects
     objects = prison["Objects"]
-    objects_to_draw = dict()
     for i, obj in objects.iteritems():
         if not i.startswith("[i") or not i.endswith("]"):
             continue
@@ -104,45 +112,48 @@ def draw_snapshot(paf):
         if pos_y not in objects_to_draw[pos_z]:
             objects_to_draw[pos_z][pos_y] = list()
         
-        objects_to_draw[get_z_for_object(obj["Type"])][pos_y].append(obj)
+        objects_to_draw[pos_z][pos_y].append(obj)
 
     for k in sorted(objects_to_draw.keys()):
-        objs = objects_to_draw[k]
+        objs_y = objects_to_draw[k]
 
-        for obj in objs:
-            coords = float(obj["Pos.x"]), float(obj["Pos.y"])
-            # fetch object sprite
-            object_sprites = resources.fetch_sprite("Object", obj["Type"])
-            if "Or.x" not in obj:
-                obj["Or.x"] = 0
-            if "Or.y" not in obj:
-                obj["Or.y"] = 0
-            
-            obj["Or.x"], obj["Or.y"] = float(obj["Or.x"]), float(obj["Or.y"])
-            print obj["Type"]
-            orient = xy_to_orientation(obj["Or.x"], obj["Or.y"])
-            s = object_sprites[orient]
-            sprite_w, sprite_h = s.size
-            pixel_pos = (int(coords[0] * CELL_WIDTH - sprite_w / 2), int(coords[1] * CELL_HEIGHT - sprite_h / 2))
-            im.paste(s, pixel_pos, s)
+        for ky in sorted(objs_y.keys()):
+            for obj in objs_y[ky]:
+                if k != -5:
+                    coords = float(obj["Pos.x"]), float(obj["Pos.y"])
+                    # fetch object sprite
+                    object_sprites = resources.fetch_sprite("Object", obj["Type"])
+                    if "Or.x" not in obj:
+                        obj["Or.x"] = 0
+                    if "Or.y" not in obj:
+                        obj["Or.y"] = 0
+                    
+                    obj["Or.x"], obj["Or.y"] = float(obj["Or.x"]), float(obj["Or.y"])
+                    orient = xy_to_orientation(obj["Or.x"], obj["Or.y"])
+                    s = object_sprites[orient]
+                    sprite_w, sprite_h = s.size
+                    pixel_pos = (int(coords[0] * CELL_WIDTH - sprite_w / 2), int(coords[1] * CELL_HEIGHT - sprite_h / 2))
+                    im.paste(s, pixel_pos, s)
 
-            # is this sprite going to draw atop a wall?
-            # if so, NO! BAD SPRITE.
-            top_cell_y = int(math.floor(coords[1]))
-            bottom_cell_y = int(math.floor(((coords[1] * CELL_HEIGHT) + sprite_h) / CELL_HEIGHT))
-            left_cell_x = int(math.floor(coords[0]))
-            right_cell_x = int(math.floor(((coords[0] * CELL_WIDTH) + sprite_w) / CELL_WIDTH))
-            for c_y in xrange(top_cell_y, bottom_cell_y + 1):
-                for c_x in xrange(left_cell_x, right_cell_x + 1):
-                    # is this cell a wall?
-                    c_n = "%d %d" % (c_x, c_y)
-                    if c_n in wall_map: # yes
-                        # redraw the wall!
-                        im.paste(wall_map[c_n]["sprite"], wall_map[c_n]["coords"])
+                    # is this sprite going to draw atop a wall?
+                    # if so, NO! BAD SPRITE.
+                    #top_cell_y = int(math.floor(coords[1]))
+                    bottom_cell_y = int(math.ceil((pixel_pos[1] + sprite_h) / CELL_HEIGHT))
+                    left_cell_x = int(math.floor(pixel_pos[0] / CELL_HEIGHT))
+                    right_cell_x = int(left_cell_x + math.ceil(sprite_w / CELL_WIDTH))
+                    c_y = bottom_cell_y
+                    for c_x in xrange(left_cell_x, right_cell_x + 1):
+                        # is this cell a wall?
+                        c_n = "%d %d" % (c_x, c_y)
+                        if c_n in wall_map: # yes
+                            # redraw the wall!
+                            im.paste(wall_map[c_n]["sprite"], wall_map[c_n]["coords"])
+                else:
+                    im.paste(*obj)
     return im
 
 if __name__ == '__main__':
-    i = draw_snapshot("start01.prison")
+    i = draw_snapshot(parse_save_from_file("start01.prison"))
     SF = 2
     #i = i.resize((i.size[0] / 2, i.size[1] / 2))
     i.save("start01.png")
