@@ -87,7 +87,7 @@ def draw_snapshot(prison, max_size=0):
             height_sf = max_height / height
             scale_factor = min(width_sf, height_sf)
 
-    width, height = width * scale_factor, height * scale_factor
+    width, height = int(width * scale_factor), int(height * scale_factor)
 
     im = PIL.Image.new("RGBA", (width, height))
 
