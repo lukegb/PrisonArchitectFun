@@ -51,11 +51,11 @@ def get_z_for_object(object_name):
     # TODO: implement! :)
     return resources.renderdepth_for_object(object_name)
 
-def rescale_image(pilimage, scale_factor):
-    return pilimage.resize((pilimage.size[0] * scale_factor, pilimage.size[1] * scale_factor))
-
 def rescale_coordinates(xy, scale_factor):
-    return (xy[0] * scale_factor, xy[1] * scale_factor)
+    return (int(xy[0] * scale_factor), int(xy[1] * scale_factor))
+
+def rescale_image(pilimage, scale_factor):
+    return pilimage.resize(rescale_coordinates(pilimage.size, scale_factor))
 
 def draw_snapshot(prison, max_size=0):
     """ Draw a .prison file represented as Python dictionaries.
@@ -75,13 +75,14 @@ def draw_snapshot(prison, max_size=0):
 
     if max_size != 0:
         if type(max_size) is int:
+            max_size = float(max_size)
             largest_dimension = max(width, height)
             if largest_dimension == width:
                 scale_factor = max_size / width
             else:
                 scale_factor = max_size / height
         else:
-            max_width, max_height = max_size
+            max_width, max_height = float(max_size[0]), float(max_size[1])
             width_sf = max_width / width
             height_sf = max_height / height
             scale_factor = min(width_sf, height_sf)
